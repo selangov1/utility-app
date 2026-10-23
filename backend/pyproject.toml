@@ -1,0 +1,9 @@
+[project]
+name = "utility-backend"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.161.1",
+    "python-multipart>=0.0.32",
+    "uvicorn[standard]>=0.54.0",
+]
