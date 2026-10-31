@@ -10,7 +10,6 @@ const tool = (id: string, name: string, extra: Partial<ToolMeta> = {}): ToolMeta
   category: 'Data',
   keywords: [],
   icon: Braces,
-  execution: 'client',
   ...extra,
 })
 

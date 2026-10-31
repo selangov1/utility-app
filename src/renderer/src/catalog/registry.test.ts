@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { tools } from './registry'
 import { CATEGORIES } from './types'
 
-// Static source scan: enforces the client/server data-exposure boundary.
-const sources = import.meta.glob<string>('/src/tools/*/**/*.{ts,tsx}', {
+// Static source scan: enforces that tools never perform network access.
+const sources = import.meta.glob<string>('../tools/*/**/*.{ts,tsx}', {
   query: '?raw',
   import: 'default',
   eager: true,
 })
-const toolDirs = new Set(Object.keys(sources).map((p) => p.split('/')[3]))
+const toolDirs = new Set(Object.keys(sources).map((p) => p.split('/')[2]))
 const NETWORK_PATTERN =
-  /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|@\/lib\/api|from\s+['"][./]*api['"]/
+  /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|navigator\s*\.\s*sendBeacon|\bimport\s*\(\s*['"]https?:/
 
 describe('tool catalog', () => {
   it('has unique, url-safe ids matching their folder', () => {
@@ -30,22 +30,10 @@ describe('tool catalog', () => {
     for (const t of tools) expect(CATEGORIES).toContain(t.category)
   })
 
-  it('client tools contain no network access', () => {
-    for (const t of tools.filter((x) => x.execution === 'client')) {
-      for (const [path, src] of Object.entries(sources)) {
-        if (path.startsWith(`/src/tools/${t.id}/`) && !path.endsWith('.test.ts')) {
-          expect(src, `${path} must not perform network requests`).not.toMatch(NETWORK_PATTERN)
-        }
-      }
-    }
-  })
-
-  it('server tools only reach the backend through their api.ts', () => {
-    for (const t of tools.filter((x) => x.execution === 'server')) {
-      for (const [path, src] of Object.entries(sources)) {
-        if (!path.startsWith(`/src/tools/${t.id}/`) || path.endsWith('/api.ts')) continue
-        if (path.endsWith('.test.ts')) continue
-        expect(src, `${path} must use ./api`).not.toMatch(/\bfetch\s*\(|@\/lib\/api/)
+  it('tools contain no network access', () => {
+    for (const [path, src] of Object.entries(sources)) {
+      if (!path.endsWith('.test.ts')) {
+        expect(src, `${path} must not perform network requests`).not.toMatch(NETWORK_PATTERN)
       }
     }
   })

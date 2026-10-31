@@ -1,24 +1,11 @@
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { defineConfig } from 'electron-vite'
 import { type Plugin } from 'vite'
-import { defineConfig } from 'vitest/config'
+import { CONTENT_SECURITY_POLICY } from './src/main/csp'
 
-// Restricts the built app to same-origin resources only, so client-side tools
-// cannot exfiltrate data even if a dependency misbehaves. Build-only because the
-// dev server relies on inline scripts for HMR.
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'none'",
-].join('; ')
-
+// Build-only because the dev server relies on inline scripts for HMR.
 function contentSecurityPolicy(): Plugin {
   return {
     name: 'content-security-policy',
@@ -33,20 +20,22 @@ function contentSecurityPolicy(): Plugin {
   }
 }
 
-// https://vite.dev/config/
+// electron-vite forces a relative base in production builds, which breaks asset URLs on
+// nested client routes (e.g. /tools/<id>). The app:// origin serves from "/", so restore it.
+function absoluteBase(): Plugin {
+  return {
+    name: 'absolute-base',
+    enforce: 'post',
+    config: () => ({ base: '/' }),
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), contentSecurityPolicy()],
-  resolve: {
-    alias: { '@': path.resolve(import.meta.dirname, './src') },
-  },
-  server: {
-    port: Number(process.env.FRONTEND_PORT ?? 5173),
-    strictPort: true,
-    proxy: { '/api': `http://localhost:${process.env.BACKEND_PORT ?? 8000}` },
-  },
-  test: {
-    // registry.test.ts scans tool sources via import.meta.glob; a persisted
-    // transform cache would hide newly added files from that boundary check.
-    fsModuleCache: false,
+  main: {},
+  renderer: {
+    plugins: [react(), tailwindcss(), absoluteBase(), contentSecurityPolicy()],
+    resolve: {
+      alias: { '@': path.resolve(import.meta.dirname, 'src/renderer/src') },
+    },
   },
 })

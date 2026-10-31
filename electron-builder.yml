@@ -1,0 +1,42 @@
+appId: com.selangov1.utilityapp
+productName: Utility App
+copyright: Copyright © selangov1
+
+directories:
+  output: release
+  buildResources: build
+
+# Everything the app needs is bundled into out/ by electron-vite.
+files:
+  - out/**/*
+  - package.json
+asar: true
+
+win:
+  target:
+    - nsis
+    - portable
+  icon: build/icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  differentialPackage: false
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+# No auto-update: don't generate update feed metadata (latest.yml) or publish anywhere.
+publish: null
+
+# Disable Electron features the app does not use to shrink the attack surface.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false

@@ -9,5 +9,4 @@ export const meta: ToolMeta = {
   category: 'Data',
   keywords: ['json', 'format', 'pretty', 'minify', 'escape', 'validate', 'beautify', 'serialize'],
   icon: Braces,
-  execution: 'client',
 }

@@ -1,33 +1,10 @@
-import { Suspense, useEffect, type ReactNode } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ExecutionBadge } from '@/components/shell/ExecutionBadge'
 import { FavoriteButton } from '@/components/shell/FavoriteButton'
 import { getToolComponent } from '@/catalog/lazy'
 import { recordRecent } from '@/catalog/preferences'
 import { getTool } from '@/catalog/registry'
-import type { ToolDefinition } from '@/catalog/types'
-import { useServerCapabilities } from '@/catalog/useServerCapabilities'
-
-/** Client tools render immediately; server tools only once the backend confirms support. */
-function ServerGate({ tool, children }: { tool: ToolDefinition; children: ReactNode }) {
-  const isServer = tool.execution === 'server'
-  const caps = useServerCapabilities(isServer)
-  if (!isServer) return children
-  if (caps.status === 'loading') return <p className="text-sm text-muted-foreground">Checking server…</p>
-  if (caps.status === 'unavailable' || !caps.ids.has(tool.id)) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Server unavailable</AlertTitle>
-        <AlertDescription>
-          This tool needs the app server, which is not reachable or does not provide it.
-        </AlertDescription>
-      </Alert>
-    )
-  }
-  return children
-}
 
 export function ToolPage() {
   const { toolId } = useParams({ from: '/tools/$toolId' })
@@ -65,24 +42,19 @@ export function ToolPage() {
         <div className="flex items-start gap-3">
           <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>
-                <h1>{tool.name}</h1>
-              </CardTitle>
-              <ExecutionBadge execution={tool.execution} />
-            </div>
+            <CardTitle>
+              <h1>{tool.name}</h1>
+            </CardTitle>
             <CardDescription>{tool.description}</CardDescription>
           </div>
           <FavoriteButton toolId={tool.id} toolName={tool.name} />
         </div>
       </CardHeader>
       <CardContent>
-        <ServerGate tool={tool}>
-          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
-            {/* oxlint-disable-next-line react/static-components -- getToolComponent caches one lazy component per tool */}
-            <ToolComponent key={tool.id} />
-          </Suspense>
-        </ServerGate>
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+          {/* oxlint-disable-next-line react/static-components -- getToolComponent caches one lazy component per tool */}
+          <ToolComponent key={tool.id} />
+        </Suspense>
       </CardContent>
     </Card>
   )

@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router'
 import { getTool, tools } from '@/catalog/registry'
 import { useFavorites } from '@/catalog/preferences'
 import { CATEGORIES, type ToolDefinition } from '@/catalog/types'
-import { ExecutionBadge } from '@/components/shell/ExecutionBadge'
 import { FavoriteButton } from '@/components/shell/FavoriteButton'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -21,9 +20,6 @@ function ToolCard({ tool }: { tool: ToolDefinition }) {
           {tool.name}
         </div>
         <p className="text-sm text-muted-foreground">{tool.description}</p>
-        <div className="mt-auto">
-          <ExecutionBadge execution={tool.execution} />
-        </div>
       </Link>
       <FavoriteButton toolId={tool.id} toolName={tool.name} className="absolute top-2 right-2" />
     </li>
@@ -57,7 +53,7 @@ export function HomePage() {
           <kbd className="rounded border px-1.5 py-0.5 font-mono text-xs">
             {isMac ? '⌘' : 'Ctrl'} K
           </kbd>{' '}
-          to jump to any tool. Tools marked “Runs locally” never send your data anywhere.
+          to jump to any tool. Everything runs locally on this device; your data is never sent anywhere.
         </p>
       </div>
       <Group title="Favorites" items={favorites} />

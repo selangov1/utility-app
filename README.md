@@ -1,96 +1,88 @@
 # Utility App
 
-A collection of searchable developer utilities. FastAPI backend (managed with [uv](https://docs.astral.sh/uv/)) and a Vite + React + TanStack Router frontend.
+A collection of searchable developer utilities, packaged as a Windows desktop app with [Electron](https://www.electronjs.org/). The UI is Vite + React 19 + TanStack Router + Tailwind 4, built with [electron-vite](https://electron-vite.org/). Everything runs on your device.
 
 ## Running
 
-Both at once (backend on 47831, frontend on 47832):
-
 ```powershell
-.\start-utilityapp.ps1
-```
-
-Or separately:
-
-```powershell
-# Backend — http://localhost:8000
-cd backend
-uv sync
-uv run uvicorn app.main:app --reload --no-server-header
-
-# Frontend — http://localhost:5173 (proxies /api to the backend)
-cd frontend
 npm install
-npm run dev
+npm run dev      # Electron with HMR (renderer served from http://localhost:5173)
 ```
 
-## Checks
+If the Electron binary fails to download behind a proxy, run `$env:NODE_USE_ENV_PROXY = '1'; node node_modules/electron/install.js`.
+
+## Checks and packaging
 
 ```powershell
-cd frontend; npm run lint; npm test; npm run build
-cd backend; uv run pytest
+npm run lint; npm test; npm run build   # build = tsc -b && electron-vite build -> out/
+npm run preview                         # run the built app
+npm run pack                            # unpacked app in release/win-unpacked
+npm run dist                            # NSIS installer + portable exe in release/
 ```
+
+Installers are unsigned (Windows SmartScreen will warn) and there is no auto-update.
 
 ## Privacy model
 
-**If data can be processed in the browser, it is — and it never leaves the device.**
+**Your data is processed on the device and never leaves it.**
 
-- Every tool declares `execution: 'client' | 'server'` and shows a **Runs locally** / **Sends data to server** badge.
-- Client tools must not perform network requests. Enforced by:
-  - oxlint: `fetch`/`XMLHttpRequest`/`WebSocket`/`EventSource` are banned outside `src/lib/api.ts`, and `@/lib/api` may only be imported from `src/tools/<id>/api.ts` (plus the capability hook);
-  - `src/catalog/registry.test.ts`: scans each client tool's sources for network access;
-  - a production Content-Security-Policy (`connect-src 'self'`, `script-src 'self'`) injected at build time.
-- Only tool **ids** are ever persisted (favorites/recents in `localStorage`) or put in URLs (`/tools/<id>`). Tool input/output is held in component state only.
-- Files are read locally (`File.arrayBuffer()`), never uploaded, by client tools. Downloads use local blob URLs.
-- The backend is stateless and only hosts tools that truly need a server (secrets, native libraries, network access the browser can't do). Every response gets `Cache-Control: no-store`, `nosniff`, `no-referrer`, `X-Frame-Options: DENY`; `/api/*` also gets `Content-Security-Policy: default-src 'none'`. Request bodies are capped (`MAX_BODY_BYTES`, default 1 MB) and never logged. `GET /api/tools` returns only server-tool ids.
+- There is no backend. Tool input/output is held in component state only.
+- The renderer must not perform network requests. Enforced by:
+  - oxlint: `fetch`/`XMLHttpRequest`/`WebSocket`/`EventSource` are banned under `src/renderer`;
+  - `src/renderer/src/catalog/registry.test.ts`: scans every tool's sources for network access;
+  - a Content-Security-Policy (`connect-src 'self'`, `script-src 'self'`) injected into `index.html` at build time and sent as a header by the `app://` protocol handler (`src/main/csp.ts`);
+  - the main process (`src/main/security.ts`) cancels every request outside `app://` (plus `data:`/`blob:`; the dev server only in `npm run dev`), denies all permission requests, blocks `window.open`, and blocks navigation to other origins.
+- The window uses `contextIsolation`, `sandbox`, no Node integration, and **no preload script**: the renderer has no bridge to Node. Packaged builds disable DevTools and the menu, and Electron fuses disable `RunAsNode`, Node CLI inspect args, `NODE_OPTIONS`, and loading code outside the asar.
+- Only tool **ids** are persisted (favorites/recents in `localStorage`) or put in URLs (`/tools/<id>`).
+- Files are read locally (`File.arrayBuffer()`); downloads use local blob URLs.
 
 ## Structure
 
 ```
-frontend/src/
-  app/            router.tsx (routes: / and /tools/$toolId), AppShell, HomePage, ToolPage
-  catalog/        types.ts (ToolDefinition), registry.ts (all tools), search.ts (fuzzy search),
-                  preferences.ts (favorites/recents), lazy.ts, useServerCapabilities.ts
-  components/
-    shell/        Sidebar (search, favorites, recents, categories), CommandPalette (Ctrl/Cmd+K),
-                  ExecutionBadge, FavoriteButton
-    io/           CodeTextarea, CopyButton, DownloadButton, FileInput
-    ui/           shadcn components
-  lib/            api.ts (the only backend client), useHotkey, theme, utils
-  tools/<id>/     meta.ts, logic.ts (pure, no React), logic.test.ts, Tool.tsx, [api.ts for server tools]
-backend/app/
-  main.py         app + middleware
-  security.py     security headers, body size limit
-  tools/          server-only tool plugins (registry + capability list)
-backend/tests/
+src/main/             Electron main process
+  index.ts            window, single-instance lock, lifecycle
+  protocol.ts         app:// scheme serving out/renderer (SPA fallback to index.html)
+  security.ts         request / permission / navigation lockdown
+  urls.ts             pure helpers: path-traversal-safe file resolution, request allowlist (+ tests)
+  csp.ts              the Content-Security-Policy shared with the renderer build
+src/renderer/
+  index.html
+  public/             favicon, theme-init.js
+  src/
+    app/              router.tsx (routes: / and /tools/$toolId), AppShell, HomePage, ToolPage
+    catalog/          types.ts (ToolDefinition), registry.ts (all tools), search.ts (fuzzy search),
+                      preferences.ts (favorites/recents), lazy.ts
+    components/
+      shell/          Sidebar (search, favorites, recents, categories), CommandPalette (Ctrl+K), FavoriteButton
+      io/             CodeTextarea, CopyButton, DownloadButton, FileInput
+      ui/             shadcn components
+    lib/              useHotkey, theme, utils
+    tools/<id>/       meta.ts, logic.ts (pure, no React), logic.test.ts, Tool.tsx
+build/icon.png        app icon (electron-builder converts it to .ico)
+electron.vite.config.ts   electron-vite config (main + renderer)
+electron-builder.yml      packaging (NSIS + portable, asar, fuses)
 ```
 
-Keyboard: **Ctrl/Cmd+K** opens the command palette, **/** focuses the sidebar search.
+Keyboard: **Ctrl+K** opens the command palette, **/** focuses the sidebar search.
 
 ## Adding a tool
 
-Decide first: **can it run in the browser?** If yes, it's a client tool. Use a server tool only when it can't.
-
-### Client tool
-
-1. Create `frontend/src/tools/<id>/`:
-   - `meta.ts` — `export const meta: ToolMeta = { id, name, description, category, keywords, icon, execution: 'client' }`
+1. Create `src/renderer/src/tools/<id>/`:
+   - `meta.ts` — `export const meta: ToolMeta = { id, name, description, category, keywords, icon }`
    - `logic.ts` — pure functions (easy to test, and to move into a Web Worker if heavy)
    - `logic.test.ts` — Vitest tests
    - `Tool.tsx` — default-exported UI using `logic.ts` and `components/io/*`
-2. Register it in `frontend/src/catalog/registry.ts`:
+2. Register it in `src/renderer/src/catalog/registry.ts`:
    `{ ...meta, load: () => import('@/tools/<id>/Tool') }`
 
 Each tool is code-split and loaded on first open. New categories go in `CATEGORIES` in `catalog/types.ts`.
 
-### Server tool
-
-1. Backend: create `backend/app/tools/<module>.py` exposing `tool = Tool(id="<id>", ..., router=router)`, and add the module to `SERVER_TOOLS` in `backend/app/tools/__init__.py`. Routes are served under `/api/tools/<id>/`. Keep handlers stateless; don't log or store input; return only what the UI needs.
-2. Frontend: same folder layout as a client tool with `execution: 'server'`, plus `api.ts`, the only file in the tool that may import `@/lib/api`. The page only renders the tool after `GET /api/tools` confirms the backend provides it.
+Tools that need Node or OS access (filesystem, native modules, network) don't exist yet. When one is needed, add a `src/preload` script exposing a minimal typed API through `contextBridge`, handle it with `ipcMain` in `src/main`, and keep the privacy rules above intact.
 
 ## Current tools
 
-| Tool | Runs | Notes |
-| --- | --- | --- |
-| JSON to CSV | locally | Paste or open a file; auto-finds nested arrays of objects (or use an explicit path); nested objects become dotted columns like `address.city`. |
-| URL Encode / Decode | locally | Component or full-URL encoding; strict UTF-8 decoding; optional `+` as space. |
+| Tool | Notes |
+| --- | --- |
+| JSON Stringify | Validate pasted JSON and run it through `JSON.stringify`: pretty-print, minify, or escape as a string literal. |
+| JSON to CSV | Paste or open a file; auto-finds nested arrays of objects (or use an explicit path); nested objects become dotted columns like `address.city`. |
+| URL Encode / Decode | Component or full-URL encoding; strict UTF-8 decoding; optional `+` as space. |

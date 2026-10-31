@@ -9,5 +9,4 @@ export const meta: ToolMeta = {
   category: 'Encoding',
   keywords: ['percent', 'escape', 'unescape', 'uri', 'querystring', 'urlencode'],
   icon: Link,
-  execution: 'client',
 }

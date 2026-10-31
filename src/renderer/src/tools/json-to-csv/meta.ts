@@ -9,5 +9,4 @@ export const meta: ToolMeta = {
   category: 'Data',
   keywords: ['convert', 'spreadsheet', 'excel', 'table', 'flatten', 'export'],
   icon: Braces,
-  execution: 'client',
 }
