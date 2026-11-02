@@ -83,6 +83,7 @@ Tools that need Node or OS access (filesystem, native modules, network) don't ex
 
 | Tool | Notes |
 | --- | --- |
+| JWT Decoder | Decode a compact JWT header and payload locally; signature verification is not performed. |
 | JSON Stringify | Validate pasted JSON and run it through `JSON.stringify`: pretty-print, minify, or escape as a string literal. |
 | JSON to CSV | Paste or open a file; auto-finds nested arrays of objects (or use an explicit path); nested objects become dotted columns like `address.city`. |
 | URL Encode / Decode | Component or full-URL encoding; strict UTF-8 decoding; optional `+` as space. |
